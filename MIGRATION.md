@@ -27,10 +27,9 @@ listing interactors use `OrdersMemStore`; its static array shares data across
 instances within one process. Core Data is a separate, tested alternative, not
 the live store. `OrdersAPI` has empty methods; it is not a functioning server API.
 
-The project targets iOS 15 and Swift language mode 5. The migration's screen
-framework and deployment floor require a decision: retain UIKit/iOS 15, or use
-SwiftUI with iOS 17+ Observation while preserving the current workflows/design.
-The question has been presented to Matthew Thomas; neither has been changed.
+The baseline targets iOS 15 and Swift language mode 5. Matthew Thomas subsequently
+approved replacing the screens with SwiftUI and raising the minimum to iOS 17,
+while preserving the design and workflows. See checkpoint 1 below.
 
 ### Verification
 
@@ -102,18 +101,80 @@ All replacements below are planned, not implemented or validated.
 No production task groups, barriers, semaphores, OperationQueues or timers were
 found in the initial source inventory. Do not invent parallel work for appearance.
 
+## Checkpoint 1 — SwiftUI and feature ownership
+
+Date: 25 October 2026. Implemented; awaiting Matthew Thomas's manual acceptance
+and Git checkpoint. **This is not a completed concurrency migration.**
+
+### Approved scope and implementation
+
+- SwiftUI and iOS 17+ were explicitly approved. The three existing workflows now
+  use `ListOrdersView`, `ShowOrderView` and `CreateOrderView`, each with its own
+  adjacent, main-actor `@Observable` ViewModel. The structural root only hosts
+  navigation. No themes, tabs or new product features were added.
+- `AppModel` composes a concrete `OrdersFeature`. ViewModels access only that
+  feature; they do not reach into workers or storage. Launch requests an early
+  refresh, but direct feature requests also work without a launch prerequisite.
+- The single-window navigation handoff selects a record in the feature. Details
+  capture its ID, and an editor takes its own value draft, so later selections
+  cannot retarget an existing screen or mutate a draft accidentally. Multiple
+  windows remain unsupported, matching the original product scope.
+- Concurrent refresh requests coalesce. Distinct saves are queued in submission
+  order, publication follows successful completion, and an older refresh cannot
+  overwrite a newly published save. Saving survives release of the editor.
+- The original worker and stores remain behind `LegacyOrdersRepository`. This
+  deliberately temporary callback boundary keeps architecture work separate
+  from async/storage conversion. The live store is still process-only memory,
+  including its legacy static state. Core Data schema and location are unchanged.
+- Original UIKit scenes, storyboard and tests remain as comparison evidence.
+  They are no longer the app's navigation root. Shared domain types are still in
+  their legacy folder until the legacy adapters are retired in a later pass.
+- Swift language mode remains 5 at this checkpoint. `IsolatedDefaultValues`
+  enables actor-isolated default feature dependencies; it is not a claim of
+  complete concurrency checking or Swift 6 adoption.
+
+### Verification and limits
+
+- App and both test targets build successfully on Xcode 26.2.
+- Full unit run with `-testLanguage en -testRegion US`: **115 tests passed**,
+  comprising 96 legacy tests and 19 new tests. Existing assertion-free examples
+  remain included in that count; they are not new coverage.
+- New tests cover isolated composition, refresh coalescing, ordered commands,
+  stale reads, successful/failed saves, retry, editor lifetime, draft isolation,
+  selected-order identity, picker presentation and text-focus order.
+- The 19 new tests also pass separately with `-testLanguage en -testRegion GB`,
+  without the legacy tests' hardcoded US formatting expectations. Result bundle:
+  `/private/tmp/CleanStore-cfa-new-tests-GB-20261025.xcresult`.
+- Simulator interaction, iPhone Air/iOS 26.2, inherited UK-style formatting:
+  opened both seeded orders; edited Amy to Amelia and saved back to details;
+  returned to list; created a synthetic Demo order; confirmed generated ID and
+  the original £1.00 placeholder total. No real payment data was entered.
+- The baseline list was captured before replacement. This limited smoke check
+  does not establish full visual parity. Shipping now uses a native SwiftUI menu,
+  and the date/time wheel expands in the form rather than becoming a keyboard
+  input view. These presentation adaptations need manual acceptance.
+- Keyboard traversal, all address/payment fields, picker reopening, cancellation,
+  iPad, rotation, Dynamic Type, VoiceOver and physical devices still need manual
+  regression. UI tests remain disabled in the inherited shared scheme.
+- Build artifacts: `/private/tmp/CleanStore-cfa-architecture`.
+- Result bundle: `/private/tmp/CleanStore-cfa-architecture-final-20261025.xcresult`.
+
+The original “Same as shipping address” switch is on by default but has no action
+or outlet. Its lack of address-copying behaviour is preserved and recorded as an
+exposed defect, not silently corrected. Failure-to-load presentation also remains
+the original empty-list behaviour until an explicit product decision.
+
 ## Next checkpoints
 
-1. Resolve the screen-framework/deployment decision, document a manual baseline,
-   and strengthen missing behaviour protection without changing product behaviour.
-2. Establish one coherent Orders Feature and AppModel composition; give each
-   screen its own ViewModel. Move business rules out of presentation. Preserve
-   the live in-memory lifetime and alternative Core Data compatibility.
-3. Commit the architecture checkpoint, then convert model operations to useful
+1. Manually review the SwiftUI architecture checkpoint, especially the form and
+   native picker adaptations, and commit it independently of concurrency changes.
+2. Convert model operations to useful
    async APIs with explicit execution ownership, command order and error outcomes.
-4. Adopt presentation concurrency/Observation as appropriate to the approved
-   platform scope. Retain tasks at their real owners and test overlapping calls.
-5. Review feature ownership, test grouping, complete concurrency checking and
+   Replace static live state with isolated instance-owned memory; preserve its
+   process-only lifetime and test Core Data compatibility separately.
+3. Adopt presentation concurrency over those async features. Retain tasks at
+   their real owners and test overlapping calls; Observation is already in place.
+4. Review feature ownership, test grouping, complete concurrency checking and
    real responsiveness iteratively. Require manual acceptance and a final
    feature-by-feature execution/behaviour report before calling migration complete.
 

@@ -17,7 +17,9 @@ defects and obtain approval for product changes instead of silently fixing them.
 Do not remove legacy tests before equivalent requirement coverage exists.
 
 The original app is UIKit/storyboard-based with an iOS 15 deployment target.
-Confirm the SwiftUI conversion and deployment-floor decision before changing either.
+Matthew Thomas approved SwiftUI and an iOS 17 minimum on 25 October 2026,
+preserving the existing design and workflows. Keep the original single-window
+behaviour; do not introduce multi-window selection semantics in this checkpoint.
 Never claim a build proves tests passed or that automated tests prove visual parity.
 
 Keep build products and result bundles outside the repository. Run destructive

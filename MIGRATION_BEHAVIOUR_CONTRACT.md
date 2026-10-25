@@ -6,7 +6,9 @@ under `CleanStoreTests/Scenes`, `Services` or `Workers`.
 
 Confirmed means explicit tests support intent, not that end-to-end behaviour has
 been manually verified. Inferred rows are source evidence requiring acceptance.
-No replacement implementation or product changes exist at this checkpoint.
+Checkpoint 1 adds SwiftUI replacements; the original tests and storage remain.
+The baseline table below is retained as provenance. The checkpoint mapping after
+it records replacement protection and current results, not completed migration.
 
 | ID | Plain-English requirement | Legacy evidence | Evidence status | Baseline | Replacement protection | Post-migration result | Manual regression | Difference and approval |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -33,11 +35,44 @@ No replacement implementation or product changes exist at this checkpoint.
 | DIFF-002 | Core Data update with unknown ID has no callback on the empty-fetch branch. | Existing defect exposed | Resolve before any continuation bridge; explicit not-found outcome needs tests |
 | DIFF-003 | Legacy equality treats sufficiently earlier dates as equal, potentially hiding incorrect test results. | Existing defect exposed | Do not use existing whole-order equality as sole replacement proof; review precise field assertions |
 | DIFF-004 | Presenter tests assert US strings but formatters use the current locale. | Environment or flaky evidence | Four tests fail with inherited UK-style output; identical binaries pass all 96 tests in US region. Keep product locale-aware; make replacement tests locale-explicit |
-| DIFF-005 | UIKit/iOS 15 → SwiftUI/iOS 17+ changes framework and device support. | Unknown | Await Matthew Thomas's scope decision before changing these |
+| DIFF-005 | UIKit/iOS 15 → SwiftUI/iOS 17+ changes framework and device support. | Approved scope change | Matthew Thomas approved “Yes—SwiftUI, iOS 17+” on 25 October 2026; implemented in checkpoint 1 |
+| DIFF-006 | The original “Same as shipping address” switch has no action or outlet and does not copy the address. | Existing defect exposed | Preserve behaviour for now; address-copying requires a separate decision/test |
+| DIFF-007 | Shipping uses a native SwiftUI menu; the date/time wheel expands in the form instead of using a text-field input view. | Framework presentation adaptation | Values and editing workflows retained; manual acceptance pending |
+
+## Checkpoint 1 replacement protection
+
+All 19 new unit tests pass as part of the 115-test US-region run. The table
+distinguishes component protection from actual Simulator interaction. Legacy
+tests still pass against legacy types, not automatically against replacement UI.
+
+| Requirements | Replacement evidence | Current result and remaining checks |
+| --- | --- | --- |
+| BEH-001–002 | `ListOrdersViewModelTests`; `OrdersFeatureTests` coalescing/stale-refresh tests; `ListOrdersView.onAppear` | Rows and locale formatting protected; refreshed list observed after save. Automated return-navigation test remains to add. |
+| BEH-003 | `ShowOrderViewModelTests` stable identity and shared-state tests | Both Amy and Bob opened with their own IDs in Simulator. |
+| BEH-004–006 | `CreateOrderViewModelTests` edit field preservation; feature ordered-save tests; detail observation test | Simulator edited Amy to Amelia and returned to updated details; synthetic new order returned to list. Complete field-by-field manual round trip remains. |
+| BEH-007–008 | `CreateOrderViewModelTests.testNewFormStartsBlankWithLegacyPickerDefaults` | Option order, blank initial labels, chosen speed/date protected. Full native picker interaction/reopening still needs manual checks. |
+| BEH-009 | `CreateOrderViewModelTests.testTextFocusAdvancesAndEndsAtLastField` | Focus policy protected; actual software keyboard traversal remains manual. Picker rows are native controls rather than text fields. |
+| BEH-010 | `CreateOrderViewModelTests.testFailureRetainsDraftAndAllowsRetry` | Failed create retains draft and permits retry. Update alert title follows draft ID; explicit failure injection in UI still outstanding. |
+| BEH-011 | `AppModelTests` isolated graphs; unchanged live adapter/store | Both seed records observed. Live static store deliberately remains until concurrency checkpoint; full relaunch acceptance still outstanding. |
+| BEH-012 | `CreateOrderViewModelTests.testDraftsAreIndependentAndBackWithoutSavingHasNoSideEffect` | Draft mutation does not publish to feature. UI back/discard still needs manual regression. |
+| BEH-013 | Original `OrdersCoreDataStoreTests`, unchanged implementation/schema | Original CRUD tests still pass; async conversion and reopen durability remain outstanding. |
+| BEH-014 | Unchanged legacy store; Simulator create journey | New record had generated ID and £1.00 placeholder total; focused store-generation test still outstanding. |
+
+Additional protection covers duplicate Save taps, commits surviving editor
+release, distinct saves completing in order, failure allowing queued work to
+proceed, and stale reads not reverting a successful edit. No timing sleeps were
+introduced in the new tests.
 
 ## Manual regression record
 
-Not yet performed. For each journey above record tester, date, Git commit, OS,
+Limited checkpoint-1 smoke check performed by Codex on 25 October 2026 against
+the uncommitted architecture checkpoint: isolated iPhone Air Simulator, iOS 26.2,
+inherited UK-style date/currency output. Both seed details, edit/save/return,
+create/save/return and generated ID/total passed. Baseline list screenshot:
+`/private/tmp/CleanStore-baseline-list.png`. No full baseline form journey or
+complete post-change manual regression has been established.
+
+For each remaining journey above record tester, date, Git commit, OS,
 device, locale, outcome and linked defect. Capture baseline screens before their
 replacement. Repeat at the architecture checkpoint and after concurrency work;
 include navigation, keyboard, draft preservation, repeated Save, error recovery,
