@@ -388,8 +388,8 @@ owner. Re-run the replacement and regression tests before deleting baseline test
 
 ## Checkpoint 4 — retire legacy paths and organise feature ownership
 
-Date: 25 October 2026. Implemented and verified below; awaiting Matthew Thomas's
-review and Git checkpoint. This checkpoint is not final migration acceptance.
+Date: 25 October 2026. Committed by Matthew Thomas as `5d2ea60`.
+This checkpoint is not final migration acceptance.
 
 ### Changes and retirement gate
 
@@ -479,3 +479,104 @@ Then audit the surviving feature's task ownership, actor reentrancy and Main
 Actor work, and decide whether to enable complete checking in project settings.
 Keep any resulting changes small and separately verified; do not treat a clean
 build or fewer files as proof that migration is finished.
+
+## Checkpoint 5 — task ownership, cancellation and Main Actor review
+
+Date: 25 October 2026. Based on committed checkpoint 4 (`5d2ea60`).
+Uses the repository's pinned CFA AI Toolkit v0.3 guidance. This is a targeted
+concurrency review, not a UI redesign or a switch to durable live storage.
+
+### Findings and refinements
+
+- No unowned fire-and-forget production Task, blocking wait, detached Task or
+  GCD scheduling path was found in the surviving app. The ownership table below
+  explains why screen dismissal does not automatically cancel shared operations.
+- Complete concurrency checking is now a project setting in Debug and Release,
+  inherited by all three targets. Swift language mode remains 5, with the existing
+  IsolatedDefaultValues setting; no default Main Actor isolation or
+  NonisolatedNonsendingByDefault opt-in was introduced.
+- The refresh merge previously searched the fetched array once for each newer
+  saved record. It now builds one ID-to-index lookup: expected O(fetched + current)
+  merge work rather than worst-case O(fetched × newer saves). It preserves fetched
+  order, appends new records, and keeps the old first-match behaviour for duplicate
+  IDs. Missing IDs are not force-unwrapped. This is an algorithmic refinement,
+  not a measured frame-time improvement.
+- Added eight deterministic tests for the cancellation and reentrancy cases below.
+  A controllable repository holds actual suspension points and explicitly completes
+  or fails them; tests use bounded expectations and cleanup rather than sleeps or
+  repeated Task.yield calls.
+
+### Task ownership and cancellation policy
+
+| Owner | Operation and lifetime |
+| --- | --- |
+| AppDelegate | Retains the launch refresh Task until completion. AppModel's launch hook requests one opportunistic refresh; it is not a screen-ready barrier. The list observes feature state and can retry. |
+| ListOrdersViewModel | Retains and shares its refresh handle. The SwiftUI .task awaits that handle, but cancellation of the outer view task does not cancel the independent feature read. The closure does not retain the screen ViewModel across suspension. |
+| CreateOrderViewModel | Retains its save handle; repeated identical submissions join it, distinct programmatic drafts queue. Only the current submitted draft may report successful editor completion. The form stays disabled while saving. |
+| OrdersFeature | Owns the shared read and ordered save tail. A cancelled caller cannot start a new read, but may join an existing one. A save cancelled before feature admission is rejected; once admitted, even a still-queued save reports its actual outcome despite caller cancellation or screen dismissal. |
+| Repositories | Expose awaited operations, not retained root Tasks. Memory transactions contain no suspension. Core Data's whole mutation/save/rollback transaction runs inside one private-context perform block with no internal suspension. |
+
+Task handles clear on completion; the feature only clears the latest save tail,
+so an earlier completion cannot discard a later command. Errors are not replaced
+by success-looking empty data. Refresh errors leave prior orders available;
+save errors remain available for the editor's failure/retry state.
+
+These guarantees are in-process: they do not promise writes survive process
+termination or grant background execution time. The live repository deliberately
+remains memory-backed, so relaunch restores the demo seeds.
+
+### Actor reentrancy and execution ownership
+
+Feature state is Main Actor-isolated, but this does not make an entire async
+operation atomic. Across repository suspension, refresh uses a captured mutation
+revision to preserve intervening saves, and saves explicitly await their predecessor.
+The new tests cover multiple edits to the same record during an old read, a newly
+saved record absent from that read, and the opposite ordering where refresh finishes
+before a pending save. No uncommitted draft is published.
+
+MemoryOrdersRepository owns in-memory CRUD on its non-main actor. The optional
+CoreDataOrdersRepository owns storage access; managed-object fetch, mapping and
+transactions execute on its private context queue, not the Main Actor. Its async
+factory is nonisolated under the current language/settings; asynchronous store
+opening bridges the framework completion exactly once. A repository actor is not
+a dedicated thread, and awaiting it does not reserve a CPU core.
+
+Main Actor work remains UI-observed state, navigation/draft handoffs, short task
+coordination, array lookup/merge and locale-sensitive presentation formatting.
+The two-row demo gives no evidence that another worker actor or a formatting
+cache would improve it. Larger datasets could make formatting and array work
+significant; profile before adding an executor hop or a cache with invalidation.
+No Task.yield, artificial async wrapper or new scheduler was added.
+
+### Verification and remaining limits
+
+- Baseline: all **46 tests passed** before changes.
+- Expanded suite: **54 tests passed** in en/US and en/GB, using Xcode 26.2 and
+  the isolated iPhone Air/iOS 26.2 Simulator. The project setting supplies complete
+  checking; no command-line strict-concurrency override is required.
+- Optimised Release Simulator build succeeded. Result-bundle diagnostics contain
+  no Swift compiler warnings or errors in the final runs. Xcode still prints its
+  no-AppIntents-dependency extraction warning. The deliberate invalid-database-path
+  test still produces expected Core Data error logs.
+- An early runner attempt could not access CoreSimulator and ran no tests. The
+  subsequent standalone build/test invocations succeeded. An initial weak-reference
+  test warning was removed before the final runs.
+- Evidence: `/private/tmp/CleanStore-cfa-checkpoint5-baseline.xcresult`,
+  `/private/tmp/CleanStore-cfa-checkpoint5-verified-US.xcresult`,
+  `/private/tmp/CleanStore-cfa-checkpoint5-verified-GB.xcresult`,
+  and `/private/tmp/CleanStore-cfa-checkpoint5-Release.xcresult`.
+- The inherited UI-test placeholder remains skipped. No automated UI tests or
+  additional manual UI acceptance are claimed for this source-only refinement.
+
+Real-device Instruments profiling, large-dataset responsiveness, process-kill
+durability, disk-full/protection failures and deterministic cancellation during
+a real SQLite save remain unverified. Feature-level controlled tests do not close
+those storage fault-injection gaps. This checkpoint changes no View layout;
+checkpoint 4's remaining manual UI/accessibility checks still apply.
+
+### Next checkpoint
+
+Review and commit checkpoint 5, then complete the outstanding manual journeys
+and the final architecture/behaviour-report review. Record remaining limitations
+explicitly rather than treating compiler checks and unit tests as full product
+acceptance.

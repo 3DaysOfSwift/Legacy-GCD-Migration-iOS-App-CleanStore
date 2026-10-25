@@ -4,6 +4,49 @@ import XCTest
 
 final class ListOrdersViewModelTests: XCTestCase {
     @MainActor
+    func testCancelledRefreshHandleIsReleasedAndRetryCanLoad() async {
+        let repository = ControllableOrdersRepository(orders: [Seeds.Orders.amy])
+        let viewModel = ListOrdersViewModel(ordersFeature: OrdersFeature(repository: repository))
+        let cancelled = viewModel.refresh()
+        cancelled.cancel()
+        await cancelled.value
+        XCTAssertEqual(repository.fetchCount, 0)
+        XCTAssertFalse(viewModel.isRefreshing)
+        XCTAssertNil(viewModel.refreshErrorMessage)
+        await viewModel.refresh().value
+        XCTAssertEqual(repository.fetchCount, 1)
+        XCTAssertEqual(viewModel.rows.map(\.id), ["aaa111"])
+    }
+
+    @MainActor
+    func testReadSurvivesListReleaseAndCancellationWithoutRetainingScreen() async {
+        let repository = ControllableOrdersRepository()
+        repository.holdsFetches = true
+        defer { repository.releasePendingRequests() }
+        let feature = OrdersFeature(repository: repository)
+        var viewModel: ListOrdersViewModel? = ListOrdersViewModel(ordersFeature: feature)
+        let screenWasReleased = { [weak viewModel] in viewModel == nil }
+        let started = expectation(description: "Read reached repository")
+        repository.fetchStarted = { started.fulfill() }
+        let read = viewModel?.refresh()
+        await fulfillment(of: [started], timeout: 2)
+        guard repository.fetchCount == 1 else {
+            XCTFail("Unexpected repository request count before completing the suspended operation")
+            return
+        }
+        read?.cancel()
+        viewModel = nil
+        XCTAssertTrue(screenWasReleased())
+        XCTAssertTrue(feature.isRefreshing)
+        repository.finishFetch(with: [Seeds.Orders.amy])
+        await read?.value
+        let replacement = ListOrdersViewModel(ordersFeature: feature)
+        XCTAssertFalse(replacement.isRefreshing)
+        XCTAssertEqual(replacement.rows.map(\.id), ["aaa111"])
+        XCTAssertEqual(repository.fetchCount, 1)
+    }
+
+    @MainActor
     func testRepeatedRefreshWaitsForOneRequestAndPublishesTogether() async {
         let repository = ControllableOrdersRepository()
         repository.holdsFetches = true

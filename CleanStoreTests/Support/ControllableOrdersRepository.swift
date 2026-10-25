@@ -63,6 +63,12 @@ final class ControllableOrdersRepository: OrdersRepository {
         continuations.forEach { $0.resume(returning: orders) }
     }
 
+    func failFetch() {
+        let continuations = fetchContinuations
+        fetchContinuations.removeAll()
+        continuations.forEach { $0.resume(throwing: Failure.unavailable) }
+    }
+
     func finishSave(with order: Order?) {
         guard !saveContinuations.isEmpty else { return }
         let continuation = saveContinuations.removeFirst()

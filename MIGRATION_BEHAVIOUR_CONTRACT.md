@@ -188,3 +188,35 @@ Still unverified manually: every keyboard transition/software-keyboard dismissal
 rendered failure/retry states, full field-by-field round trip, VoiceOver, Dynamic
 Type, iPad, rotation and physical devices. The inherited UI-test target remains
 skipped in the shared scheme; no automated UI coverage is claimed.
+
+## Checkpoint 5 concurrency evidence
+
+No product behaviour change is intended. Main Actor state publication and the
+existing shared-read/ordered-save policies remain in place; refresh merging is
+indexed without changing record order or first-match semantics.
+
+| Requirement / risk | Additional automated evidence |
+| --- | --- |
+| Cancel before starting a read | OrdersFeatureTests.testPreCancelledRefreshDoesNotStartReadAndLaterRefreshWorks: no repository call or error state; subsequent request succeeds. |
+| Shared read fails while another caller is cancelled | OrdersFeatureTests.testSharedReadFailureReleasesAllWaitersAndAllowsRetry: one read, both waiters finish, old orders retained, error visible, later retry clears it. |
+| Cancel a save already accepted but still queued | OrdersFeatureTests.testQueuedSaveSurvivesCancellationBeforeItsRepositoryCall: earlier write finishes first, accepted second write still commits, later command remains usable. |
+| Repeated edits and a new record overtake an old read | OrdersFeatureTests.testLateRefreshKeepsLatestOfRepeatedSavesAndAppendsNewRecord: latest edit wins and new record is retained. |
+| Legacy snapshot repeats or omits an ID | OrdersFeatureTests.testRefreshMergePreservesLegacyDuplicateAndMissingIDsWithoutTrapping: first match updated, duplicate and unidentified row retained as before. This does not promise unique SwiftUI row identity for malformed data. |
+| Read finishes while a save is pending | OrdersFeatureTests.testRefreshFinishingBeforePendingSaveDoesNotPublishUncommittedDraft: old value until commit, then saved value. |
+| Cancelled ViewModel refresh handle is cleared | ListOrdersViewModelTests.testCancelledRefreshHandleIsReleasedAndRetryCanLoad: initial cancellation starts no read and retry is not stranded on the old handle. |
+| List screen disappears during shared read | ListOrdersViewModelTests.testReadSurvivesListReleaseAndCancellationWithoutRetainingScreen: ViewModel deallocates; read completes and a replacement screen observes the result. |
+
+The existing save-failure, duplicate-submission, stale-editor-completion,
+editor-release and real-repository tests remain active. The tests control
+suspension order; they are not a performance benchmark or proof against every
+possible schedule. Real SQLite cancellation-after-admission and failed-save
+rollback fault injection remain separately unverified.
+
+Checkpoint 5 verification: 46 baseline tests passed before editing; all 54
+replacement tests passed in en/US and en/GB afterwards. Complete concurrency
+checking is now persisted in both project configurations; the Release Simulator
+build also passed. Final evidence:
+`/private/tmp/CleanStore-cfa-checkpoint5-verified-US.xcresult`,
+`/private/tmp/CleanStore-cfa-checkpoint5-verified-GB.xcresult` and
+`/private/tmp/CleanStore-cfa-checkpoint5-Release.xcresult`.
+This does not add automated UI coverage or close the manual acceptance list.

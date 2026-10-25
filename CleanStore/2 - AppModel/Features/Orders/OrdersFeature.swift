@@ -28,6 +28,7 @@ final class OrdersFeature {
     }
 
     /// Equivalent reads share completion, independent of any one caller's lifetime.
+    /// A cancelled caller may still join a read already in progress, but cannot start one.
     func refresh() async {
         if let refreshTask {
             await refreshTask.value
@@ -43,12 +44,21 @@ final class OrdersFeature {
                 // Keep unrelated fetched records, even when a save overtakes the first
                 // load. Only records committed since this read began override it.
                 var mergedOrders = fetchedOrders
+                // Index once rather than scanning the fetched array for every newer save.
+                // Preserve the first-match policy even if a legacy snapshot repeats an ID.
+                var indicesByID: [String: Int] = [:]
+                for (index, order) in fetchedOrders.enumerated() {
+                    if let id = order.id, indicesByID[id] == nil {
+                        indicesByID[id] = index
+                    }
+                }
                 for savedOrder in orders {
                     guard let id = savedOrder.id,
                           let revision = savedOrderRevisions[id], revision > requestedRevision else { continue }
-                    if let index = mergedOrders.firstIndex(where: { $0.id == id }) {
+                    if let index = indicesByID[id] {
                         mergedOrders[index] = savedOrder
                     } else {
+                        indicesByID[id] = mergedOrders.count
                         mergedOrders.append(savedOrder)
                     }
                 }
