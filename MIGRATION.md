@@ -6,6 +6,10 @@ This demonstration adopts Cooperative Feature Architecture and Swift Concurrency
 in CleanStore, preserving its product behaviour through reviewable checkpoints.
 The original Clean Swift authorship and licence remain intact.
 
+Current handover: [checkpoint 6 implementation report](MIGRATION_REPORT.md).
+Architecture/concurrency implementation is reviewed; final product acceptance
+remains open. Earlier checkpoint sections below are historical records.
+
 - Upstream: `Clean-Swift/CleanStore`.
 - Fork: `3DaysOfSwift/Legacy-GCD-Migration-iOS-App-CleanStore`.
 - Branch: `migration/cfa-swift-concurrency`.
@@ -580,3 +584,51 @@ Review and commit checkpoint 5, then complete the outstanding manual journeys
 and the final architecture/behaviour-report review. Record remaining limitations
 explicitly rather than treating compiler checks and unit tests as full product
 acceptance.
+
+## Checkpoint 6 — architecture review and acceptance handover
+
+Date: 25 October 2026. Checkpoint 5 is committed as `0d269e9`; the worktree was
+clean before this review. The repository's pinned CFA AI Toolkit v0.3 migration
+guidance was used again. No application, project or test code changed in this
+checkpoint: only this ledger, the behaviour contract and the new report.
+
+### Review outcome
+
+The three feature-connected screens have separate observable ViewModels, the
+structural RootView stays minimal, AppModel composes one Orders feature, and all
+model storage/data files have an Orders owner. Task lifetimes and save admission
+are explicit. Main Actor state coordination awaits non-main storage; the remaining
+Core Data completion bridge is confined to its asynchronous factory. No blocking
+structural defect requiring another source rewrite was found.
+
+[MIGRATION_REPORT.md](MIGRATION_REPORT.md) records each operation's behaviour,
+execution owner, evidence and limits. It also preserves the open date-equality and
+inert-address-switch concerns rather than silently changing product behaviour.
+This is an implementation handover, not an assertion of completed acceptance.
+
+### Verification
+
+- All 54 tests passed in en/US; all 54 passed again in en/GB, on the isolated
+  iPhone Air/iOS 26.2 Simulator with Xcode 26.2.
+- An unsigned generic-iOS Release build succeeded. Built metadata retains the
+  existing bundle ID, iOS 17 minimum, iPhone/iPad families, orientations and
+  single-window policy. No physical-device run or signed distribution archive
+  is implied.
+- Manual Simulator create/save/detail/reopen checked all 16 populated text fields,
+  One-Day shipping, generated ID and £1.00 total. Editing billing ZIP saved on one
+  tap, returned to the same order and reopened with the new ZIP. Hardware Return
+  progression was sampled; rapid batched input was not reliable enough to claim
+  a complete keyboard-quality pass. See the contract for exact qualifications.
+- Results: `/private/tmp/CleanStore-cfa-checkpoint6-US.xcresult`,
+  `/private/tmp/CleanStore-cfa-checkpoint6-GB.xcresult`, and
+  `/private/tmp/CleanStore-cfa-checkpoint6-device-Release.xcresult`.
+- UI-test placeholder still skipped. No new automated UI coverage or performance
+  improvement is claimed.
+
+### Next decision
+
+Review/commit this handover, then record Matthew Thomas's acceptance of the native
+SwiftUI picker adaptation and the outstanding keyboard, failure-state,
+accessibility, layout and device checks. Explicitly agree which profiling/storage
+fault-injection items are deferred for this demonstration. Once that acceptance
+is recorded, close the migration; another speculative refactor is not required.

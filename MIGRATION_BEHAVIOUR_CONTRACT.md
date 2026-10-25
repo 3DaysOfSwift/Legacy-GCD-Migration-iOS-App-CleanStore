@@ -9,6 +9,9 @@ been manually verified. Inferred rows are source evidence requiring acceptance.
 Checkpoint 1 added SwiftUI replacements; checkpoint 4 removes the unused legacy code.
 The baseline table below is retained as provenance. The checkpoint mapping after
 it records replacement protection and current results, not completed migration.
+For the current consolidated status, read [MIGRATION_REPORT.md](MIGRATION_REPORT.md)
+and the checkpoint 6 acceptance summary at the end; "Pending" and "Not migrated"
+in the baseline table are historical, not today's implementation status.
 
 | ID | Plain-English requirement | Legacy evidence | Evidence status | Baseline | Replacement protection | Post-migration result | Manual regression | Difference and approval |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -32,13 +35,13 @@ it records replacement protection and current results, not completed migration.
 | ID | Evidence | Classification | Decision/status |
 | --- | --- | --- | --- |
 | DIFF-001 | Worker fetch failure becomes `[]`; UI cannot distinguish failed load from empty results. | Intended approved change | Matthew Thomas approved error + Retry with retained orders on 25 October 2026. Implemented/tested in checkpoint 2; rendered failure-state acceptance remains outstanding. |
-| DIFF-002 | Core Data update with unknown ID has no callback on the empty-fetch branch. | Existing defect exposed | Checkpoint 3 replacement throws an explicit not-found error; missing/nil update, fetch and delete tests pass. The unused legacy implementation remains until retirement. |
+| DIFF-002 | Core Data update with unknown ID has no callback on the empty-fetch branch. | Existing defect exposed | Checkpoint 3 replacement throws an explicit not-found error; missing/nil update, fetch and delete tests pass. The legacy implementation was retired in checkpoint 4. |
 | DIFF-003 | Legacy equality treats sufficiently earlier dates as equal, potentially hiding incorrect test results. | Existing defect exposed | Do not use existing whole-order equality as sole replacement proof; review precise field assertions |
 | DIFF-004 | Presenter tests assert US strings but formatters use the current locale. | Environment or flaky evidence | Four tests fail with inherited UK-style output; identical binaries pass all 96 tests in US region. Keep product locale-aware; make replacement tests locale-explicit |
 | DIFF-005 | UIKit/iOS 15 → SwiftUI/iOS 17+ changes framework and device support. | Approved scope change | Matthew Thomas approved “Yes—SwiftUI, iOS 17+” on 25 October 2026; implemented in checkpoint 1 |
 | DIFF-006 | The original “Same as shipping address” switch has no action or outlet and does not copy the address. | Existing defect exposed | Preserve behaviour for now; address-copying requires a separate decision/test |
 | DIFF-007 | Shipping uses a native SwiftUI menu; the date/time wheel expands in the form instead of using a text-field input view. | Framework presentation adaptation | Values and editing workflows retained; manual acceptance pending |
-| DIFF-008 | Legacy Core Data mapping reads every shipping speed as Standard despite storing its actual value. | Approved defect correction | Matthew Thomas approved preserving stored shipping speed on 25 October 2026. Checkpoint 3 replacement and real SQLite round-trip tests implement this; legacy mapper remains unchanged for baseline comparison. |
+| DIFF-008 | Legacy Core Data mapping reads every shipping speed as Standard despite storing its actual value. | Approved defect correction | Matthew Thomas approved preserving stored shipping speed on 25 October 2026. Checkpoint 3 replacement and real SQLite round-trip tests implement this; the legacy mapper was retired in checkpoint 4 and remains available in Git. |
 
 ## Checkpoint 1 replacement protection
 
@@ -220,3 +223,34 @@ build also passed. Final evidence:
 `/private/tmp/CleanStore-cfa-checkpoint5-verified-GB.xcresult` and
 `/private/tmp/CleanStore-cfa-checkpoint5-Release.xcresult`.
 This does not add automated UI coverage or close the manual acceptance list.
+
+## Checkpoint 6 acceptance summary
+
+Review target: committed `0d269e9`, 25 October 2026. Application/test source is
+unchanged in this documentation checkpoint. All 54 tests passed again in en/US
+and en/GB; an unsigned generic-iOS Release build passed. Result paths and ownership
+findings are in [MIGRATION_REPORT.md](MIGRATION_REPORT.md).
+
+| Requirements | Current evidence | Remaining acceptance |
+| --- | --- | --- |
+| BEH-001–003 | Automated refresh/locale/identity/detail tests; manual list, seeded details and newly created detail values | Full return-navigation automation is absent; no pixel-parity assertion |
+| BEH-004–006, 014 | Manual new order with all 16 text fields, One-Day shipping, single-tap Save, generated ID/£1.00, full text-field reopening; changed billing ZIP reopens as 10002 with same ID/date/total; full automated draft/save tests | Physical-device form/navigation acceptance |
+| BEH-007–008 | Three option labels inspected; One-Day selected/reopened in checkpoint 6; Two-Day and changed expiry selected/reopened in checkpoint 4; automated value/order/format tests | Matthew Thomas's acceptance of menu/inline wheel adaptation |
+| BEH-009 | Automated complete 16-field sequence and final nil focus; manual row focus and hardware Return samples | All software-keyboard transitions and final dismissal, scrolling and input responsiveness |
+| BEH-010, DIFF-001 | Controlled feature/ViewModel failures retain orders/drafts and allow retry | Rendered load-error/Retry and create/update error-alert/retry journeys |
+| BEH-011–012 | Automated isolated process-only store and independent drafts; checkpoint 4 manual relaunch restores seeds and Back discards edits | Developer regression acceptance |
+| BEH-013 | Eight real Core Data tests, schema/path retained, approved shipping-speed fix | Real disk/protection/rollback faults and admitted-save cancellation remain unverified |
+
+Checkpoint 6 manual run was performed by Codex on the isolated iPhone Air/iOS 26.2
+Simulator with UK-style output. All data was synthetic. The saved order's actual
+visible pre-save values matched the reopened values. Some rapid batched keyboard
+input differed from intended text (for example "Unit 2" appeared as "It 2"); this
+run does not establish whether that was automation pacing, keyboard behaviour or
+an app issue, and does not close the keyboard-quality check. Separately paced
+CVV/billing entry and the 10001 → 10002 edit produced the intended text.
+
+No new rendered failure checks, automated UI tests, VoiceOver, Dynamic Type,
+iPad/rotation or physical-device runs were performed. No new production failure
+injection or preference changes were introduced for testing. These limitations,
+plus device profiling and storage fault-injection scope, require an explicit
+accept/defer decision before final closure; unit-test success is not that decision.
