@@ -32,12 +32,13 @@ it records replacement protection and current results, not completed migration.
 | ID | Evidence | Classification | Decision/status |
 | --- | --- | --- | --- |
 | DIFF-001 | Worker fetch failure becomes `[]`; UI cannot distinguish failed load from empty results. | Intended approved change | Matthew Thomas approved error + Retry with retained orders on 25 October 2026. Implemented/tested in checkpoint 2; rendered failure-state acceptance remains outstanding. |
-| DIFF-002 | Core Data update with unknown ID has no callback on the empty-fetch branch. | Existing defect exposed | Resolve before any continuation bridge; explicit not-found outcome needs tests |
+| DIFF-002 | Core Data update with unknown ID has no callback on the empty-fetch branch. | Existing defect exposed | Checkpoint 3 replacement throws an explicit not-found error; missing/nil update, fetch and delete tests pass. The unused legacy implementation remains until retirement. |
 | DIFF-003 | Legacy equality treats sufficiently earlier dates as equal, potentially hiding incorrect test results. | Existing defect exposed | Do not use existing whole-order equality as sole replacement proof; review precise field assertions |
 | DIFF-004 | Presenter tests assert US strings but formatters use the current locale. | Environment or flaky evidence | Four tests fail with inherited UK-style output; identical binaries pass all 96 tests in US region. Keep product locale-aware; make replacement tests locale-explicit |
 | DIFF-005 | UIKit/iOS 15 → SwiftUI/iOS 17+ changes framework and device support. | Approved scope change | Matthew Thomas approved “Yes—SwiftUI, iOS 17+” on 25 October 2026; implemented in checkpoint 1 |
 | DIFF-006 | The original “Same as shipping address” switch has no action or outlet and does not copy the address. | Existing defect exposed | Preserve behaviour for now; address-copying requires a separate decision/test |
 | DIFF-007 | Shipping uses a native SwiftUI menu; the date/time wheel expands in the form instead of using a text-field input view. | Framework presentation adaptation | Values and editing workflows retained; manual acceptance pending |
+| DIFF-008 | Legacy Core Data mapping reads every shipping speed as Standard despite storing its actual value. | Approved defect correction | Matthew Thomas approved preserving stored shipping speed on 25 October 2026. Checkpoint 3 replacement and real SQLite round-trip tests implement this; legacy mapper remains unchanged for baseline comparison. |
 
 ## Checkpoint 1 replacement protection
 
@@ -84,6 +85,28 @@ Additional concurrency evidence: pre-admission cancellation writes nothing;
 an admitted save completes despite caller cancellation; a cancelled refresh
 waiter does not cancel shared work; a delayed initial fetch preserves both newer
 edits and unrelated records. Failures release the queue for subsequent work.
+
+## Checkpoint 3 replacement protection
+
+136 tests passed with complete concurrency checking enabled diagnostically.
+`CoreDataOrdersRepositoryTests` adds eight real-storage tests; the 15 original
+Core Data callback tests are retained. The app still composes MemoryOrdersRepository.
+
+| Requirements | Replacement evidence | Result / qualification |
+| --- | --- | --- |
+| BEH-013 create/fetch/update/delete | `testCreateUpdateAndDeleteReachDiskBeforeReturning` | Separate readers see committed mutations while writer remains alive; no deinit dependency. Same process, independent coordinators—not a process-kill test. |
+| BEH-013 compatibility | `testReadsExistingSchemaRecordsWithoutRewritingThem` | A fixture written with the existing managed-object schema is readable; original Documents/CleanStore.sqlite location asserted. Model file unchanged. |
+| BEH-013 explicit failures, DIFF-002 | `testMissingFetchUpdateAndDeleteThrowAndDoNotStrandLaterWrites`, `testMalformedRecordReturnsErrorInsteadOfCrashing` | Missing/nil IDs and malformed fields return errors, not hangs/crashes. Valid later commands still work. |
+| BEH-013 opening errors | `testOpeningFailureIsReturnedAndCanBeRetried` | Invalid test path returns an error; subsequent valid opening succeeds. No silent in-memory fallback. |
+| BEH-014 defaults | `testGeneratedIDAndTotalPreserveDraftAndRunOffMain` | ID/default total preserved; ID-generation closure observed off-main. Not a performance profile. |
+| DIFF-008 stored shipping speed | CRUD round-trip and existing-schema fixture tests | Approved fix verified for saved One-Day/Two-Day values; optional street2 and exact dates also checked. |
+| Concurrency isolation | `testConcurrentCreatesKeepBothRecordsInIndependentTransactions`, `testPreCancelledWriteDoesNotMutateStore` | Concurrent records both survive; pre-cancelled command writes nothing. Submission order across independent callers is not promised. |
+
+New tests use isolated temporary databases. Expected Core Data error logs arise
+from the intentional invalid-path test. Post-admission cancellation, actual
+disk-full/protection failures and rollback after a real failed save remain
+fault-injection gaps, not claimed coverage. The existing feature fake tests
+still protect UI failure/retry state, separately from these storage guarantees.
 
 ## Manual regression record
 

@@ -167,10 +167,11 @@ the original empty-list behaviour until an explicit product decision.
 
 ## Next checkpoints
 
-1. Accept and commit checkpoint 2's live async path. Complete the remaining
-   form, picker and failure-state manual checks from the behaviour contract.
-2. Convert the alternative Core Data implementation with explicit opening,
-   queue confinement, error outcomes and save/reopen compatibility evidence.
+1. Checkpoint 2 is committed as `8533d24`. Complete the remaining form, picker
+   and failure-state manual checks from the behaviour contract.
+2. Review and commit checkpoint 3's alternative Core Data repository. It has
+   explicit opening, private-queue transactions and save/reopen evidence; it
+   does not replace the live in-memory store.
 3. Retire legacy VIP/callback source and tests only after mapping equivalent
    replacement requirements. Preserve attribution and historical evidence in Git.
 4. Review feature ownership, test grouping, complete concurrency checking and
@@ -307,3 +308,80 @@ were then rechecked successfully in the Simulator.
 Next: manually accept this live-path checkpoint, commit it, then address the
 alternative Core Data implementation and replacement coverage before retiring
 the old callback layer. Keep visual/behaviour acceptance separate from test counts.
+
+## Checkpoint 3 — alternative Core Data async repository
+
+Started from committed checkpoint 2 (`8533d24`). The migration and test skills
+guided this bounded storage pass. `CoreDataOrdersRepository` lives under the
+Orders feature's Storage folder and conforms to the existing async repository
+contract. Single-record fetch and delete preserve additional capabilities of the
+original alternative store without adding unused operations to the live contract.
+AppModel composition, UI, bundle identifier, schema and live process-only lifetime
+are unchanged. The legacy store and its 15 callback tests remain temporarily for
+comparison, not as the migrated implementation.
+
+### Execution ownership and completion
+
+- `open(at:modelURL:)` explicitly loads the existing model and opens SQLite.
+  Construction does not silently start tasks or save data. Under this project's
+  Swift 5 concurrency semantics, the nonisolated async factory executes outside
+  MainActor. Model decoding is still synchronous framework work there; it has
+  not been profiled. SQLite opening uses the framework's asynchronous store-add
+  option, not blocking work hidden inside a detached Task.
+- One persistent-store description has one completion callback. A checked
+  continuation bridges that opening API; CRUD uses the existing native async
+  `context.perform` API instead of wrapping the legacy callback variants.
+- The repository actor owns a private-queue context connected directly to the
+  persistent-store coordinator. Managed objects and mapping stay on that queue;
+  callers receive Sendable Order values. No unchecked annotations were added.
+- Each write enqueues one indivisible context block: locate/create, map, save,
+  return. Errors roll back pending context changes and propagate. Success means
+  `context.save()` completed, not merely that a child context pushed changes to
+  a parent. There is no deinit save. Independent callers are not promised source
+  launch order; feature-level submission ordering remains OrdersFeature's job.
+- Cancellation before admission prevents the write. Once queued, the transaction
+  reports its actual outcome; cancellation does not pretend a completed save was
+  undone. Opening cannot be interrupted by task cancellation: the factory waits
+  for the framework callback before acknowledging it. No retained root Task or
+  extra scheduler was needed in this repository.
+- Missing IDs return explicit errors. Malformed required fields return an error
+  rather than force-unwrapping or inventing values; optional second address lines
+  remain optional. Shipping speed now reflects the stored value, explicitly
+  approved by Matthew Thomas on 25 October 2026 (DIFF-008).
+- The default URL is still Documents/CleanStore.sqlite. Automatic model migration
+  and inferred mapping are explicitly disabled, matching the original nil-option
+  opening policy. The existing `.xcdatamodeld` was not edited.
+
+### Verification and limits
+
+Final run: **136 tests passed**, including the original 96, checkpoint 2's 32,
+and 8 new real SQLite tests. Xcode 26.2, iPhone Air Simulator/iOS 26.2, en/US,
+Swift 5 with `SWIFT_STRICT_CONCURRENCY=complete` as a diagnostic override.
+Result: `/private/tmp/CleanStore-cfa-coredata-final-20261025.xcresult`.
+
+The new tests cover CRUD persistence visible to separately opened readers while
+the writer is still alive, stored shipping speed, exact dates and optional fields,
+missing/nil IDs and subsequent successful writes, generated defaults, concurrent
+creates, pre-cancelled writes, opening failure followed by another opening attempt,
+legacy-schema fixtures and malformed records. Each uses a unique temporary test
+directory; no populated developer database is touched. Temporary stores are left
+for OS reclamation after Core Data releases its handles.
+
+The first successful 136-test run also emitted ambiguous entity-selection
+warnings when several models were open. Insertion now resolves the entity from
+its own context rather than the class-wide lookup; the final run has no such
+warnings. The intentional bad-path opening test still emits expected Core Data
+error diagnostics. No compiler warnings point to either new source file, but
+retained legacy source/tests still produce complete-checking warnings: this is
+not a warning-free project or Swift 6 completion.
+
+Remaining limits: no physical-device profiling, disk-full/protection-error save
+injection, process-kill durability test, or deterministic cancellation-during-save
+test. Rollback and post-admission cancellation policy are code-reviewed, not fully
+fault-injection-proven. The reopening test uses independent coordinators in one
+process, not a fresh process. No new manual UI acceptance is claimed for this
+storage-only checkpoint. The earlier UI/accessibility gaps remain open.
+
+Next: commit this checkpoint, then map and retire the unused legacy layers in a
+separate pass, moving their remaining storage representations under their feature
+owner. Re-run the replacement and regression tests before deleting baseline tests.
