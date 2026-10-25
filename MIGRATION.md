@@ -86,7 +86,8 @@ xcodebuild -project CleanStore.xcodeproj -scheme CleanStore \
 
 ## Concurrency inventory
 
-All replacements below are planned, not implemented or validated.
+The table records the initial inventory. Checkpoint 2 below records the live
+path's replacements; retained legacy comparison code is not yet retired.
 
 | Legacy boundary | Current guarantee and risk | Intended ownership/replacement | Required evidence |
 | --- | --- | --- | --- |
@@ -166,14 +167,12 @@ the original empty-list behaviour until an explicit product decision.
 
 ## Next checkpoints
 
-1. Manually review the SwiftUI architecture checkpoint, especially the form and
-   native picker adaptations, and commit it independently of concurrency changes.
-2. Convert model operations to useful
-   async APIs with explicit execution ownership, command order and error outcomes.
-   Replace static live state with isolated instance-owned memory; preserve its
-   process-only lifetime and test Core Data compatibility separately.
-3. Adopt presentation concurrency over those async features. Retain tasks at
-   their real owners and test overlapping calls; Observation is already in place.
+1. Accept and commit checkpoint 2's live async path. Complete the remaining
+   form, picker and failure-state manual checks from the behaviour contract.
+2. Convert the alternative Core Data implementation with explicit opening,
+   queue confinement, error outcomes and save/reopen compatibility evidence.
+3. Retire legacy VIP/callback source and tests only after mapping equivalent
+   replacement requirements. Preserve attribution and historical evidence in Git.
 4. Review feature ownership, test grouping, complete concurrency checking and
    real responsiveness iteratively. Require manual acceptance and a final
    feature-by-feature execution/behaviour report before calling migration complete.
@@ -181,3 +180,130 @@ the original empty-list behaviour until an explicit product decision.
 At every checkpoint: build, run affected and regression tests, update the contract,
 classify differences, and leave a reviewable Git checkpoint. Runtime profiling
 and manual regression remain separate from compiler/test success.
+
+## Checkpoint 2 — async live storage and owned task lifetimes
+
+Date: 25 October 2026. Architecture checkpoint committed as `a406aef` before this
+work began. This pass follows v0.3's migration and unit-test skills. It covers the
+live in-memory path, not the alternative Core Data store or legacy source removal.
+
+### Routes and responsibilities
+
+```text
+ListOrdersView → ListOrdersViewModel → OrdersFeature.refresh()
+ShowOrderView → ShowOrderViewModel → OrdersFeature's published orders
+CreateOrderView → CreateOrderViewModel → OrdersFeature.save(draft)
+                                           ↓
+                                  OrdersRepository (async)
+                                           ↓
+                              MemoryOrdersRepository (actor)
+```
+
+- `MemoryOrdersRepository` owns the process-only stored collection and atomic
+  per-record reads/writes on its own actor, not MainActor. It replaces the live
+  callback adapter; it never reads the old static `OrdersMemStore`. Each graph
+  gets its own storage. Initial seeds, record order, ID format and placeholder
+  total remain the sample's existing behaviour. Nothing is written to disk.
+- `OrdersRepository` defines the replaceable async storage boundary. Methods
+  return domain values or throw. `Order` and its nested value types now conform
+  to `Sendable`; no custom unchecked conformance or detached Task was added.
+- `OrdersFeature` owns observable orders, retained errors and request policies
+  on MainActor. Repository calls suspend while its actor performs the work.
+  Short collection publication/merging remains on MainActor; this is not a
+  claim that every model instruction executes on another thread.
+- Screen ViewModels retain interaction tasks. The list exposes loading and
+  failure presentation; the editor keeps its draft, save progress and alert.
+  The App delegate retains the app-lifetime launch task. AppModel keeps only
+  its existing feature and one-time launch guard and now awaits refresh.
+
+### Request, ordering and cancellation contract
+
+| Operation | Equivalence/admission | Lifetime and completion |
+| --- | --- | --- |
+| Feature refresh | All overlapping fetch-all requests share one in-flight task | Every caller awaits that task. Cancelling one caller does not cancel a read needed by others. A pre-cancelled caller does not create a new read. Success/failure publishes before handle cleanup. |
+| Feature save | Every admitted command is distinct, including identical-looking new orders | A retained predecessor chain orders the whole operation across awaits. Each caller receives its own result/error. Failure does not strand the next command. Pre-admission cancellation rejects without writing; an admitted commit continues and returns its actual outcome even if its waiter is cancelled. |
+| List interaction | Repeated refresh requests share a retained ViewModel task | The screen `.task` awaits its handle; shared refresh may finish after dismissal. |
+| Editor interaction | Same draft revision shares its pending task; a changed draft queues behind it | UI disables editing while saving, but programmatic distinct edits are also preserved. Older completion cannot dismiss or replace a newer draft. Already-successful editors do not submit again. Commits survive editor release. |
+| Launch opportunity | One AppModel Boolean prevents repeat launch work | Delegate task awaits feature refresh without blocking root UI. Screen requests join the same feature read. |
+
+For this demo, a committed save means the actor's in-memory collection changed,
+not disk durability. Process termination still resets the data. No delays,
+`Task.yield()`, task groups or background queues were invented for demonstration.
+The memory actor's methods do not suspend during their read/modify/write steps.
+
+A delayed initial snapshot now merges records committed since the read began:
+it preserves the newer edit **and** unrelated fetched orders. This protects the
+existing shared-record requirement rather than dropping the whole older snapshot.
+
+### Approved product change
+
+Matthew Thomas approved showing load failures and a Retry button while retaining
+previous orders. The feature retains the error separately; the list ViewModel
+provides the message and the View renders it. Initial loading has a small native
+progress row. Retry repeats the domain request through the same feature. The
+original create/update failure alert and draft retention are preserved.
+
+### Evidence and remaining work
+
+- Final US-region Simulator suite: **128 tests passed**, including all 96 legacy
+  tests and 32 tests for the new architecture/async path. Existing empty legacy
+  examples still count numerically, not as meaningful coverage.
+- Controlled tests cover equivalent refresh completion, cancelled refresh
+  waiters, sequential distinct saves, failure cleanup, pre-admission cancellation,
+  admitted-save lifetime, stale initial reads, failed loads/retry, editor release,
+  duplicate taps and changed drafts. New concurrency tests use continuations and
+  bounded XCTest expectations, not sleeps or scheduler polling.
+- Real actor tests cover isolated collections, preserved seeds/fields, generated
+  IDs/placeholder totals, record-specific update, missing-ID failure and concurrent
+  creates. An assertion in ID generation verifies it ran off the main thread in
+  that test; this is not a complete performance profile.
+- Final result bundle: `/private/tmp/CleanStore-cfa-async-writeback-20261025.xcresult`.
+  Earlier 126-test runs preceded the writeback regression fix; they did not
+  establish correct on-screen dismissal.
+- A `SWIFT_STRICT_CONCURRENCY=complete` diagnostic build-for-testing succeeded.
+  It exposed warnings in retained legacy UIKit routing, static state and tests;
+  this is not a warning-free project or Swift 6 adoption. A new binding's
+  function-conversion warning was corrected with an explicitly inferred closure.
+  Swift language mode remains 5; complete checking was a command-line diagnostic
+  override, not a silently changed project setting.
+- One fresh diagnostic attempt could not connect to CoreSimulator and reported
+  an unavailable iOS runtime while compiling storyboards. A standalone retry
+  succeeded; this was not treated as a source-code test failure.
+- Simulator smoke check by Codex: iPhone Air/iOS 26.2, UK-style formatting,
+  uncommitted checkpoint 2. Opened Amy, edited her name, verified single-tap Save
+  returns to updated details, created a synthetic order with one Save, observed
+  the £1.00 total in the list, then terminated/relaunched and confirmed only the
+  two original seeds remained. No real payment data was used.
+- Rendering the injected load-failure/Retry state, full keyboard/picker flows,
+  VoiceOver, iPad and physical-device checks remain unverified. The unit tests
+  establish failure state and retry behaviour, not rendered accessibility.
+- Core Data async conversion, exact error/durability handling, legacy retirement,
+  complete-concurrency cleanup, physical-device profiling and full manual
+  regression remain outstanding. Do not call the whole migration complete.
+
+### Regression found by Simulator interaction
+
+The first async editor build saved its record but needed a second Save tap to
+dismiss. Reassigning an identical text-field snapshot during focus resignation
+incremented the draft revision, making its completion look obsolete. Draft
+revisions now advance only for different snapshots. `Order.hasSameSnapshot`
+uses exact dates without changing the legacy tolerance-based `==` contract.
+New tests cover identical writeback during save and a genuinely changed earlier
+date; the latter must not be discarded as duplicate. Single-tap edit and create
+were then rechecked successfully in the Simulator.
+
+### Updated primitive inventory
+
+| Path | Current status |
+| --- | --- |
+| Live worker main-queue callbacks | Removed from live composition; native async repository calls replace them. |
+| Live static in-memory array | Replaced by one instance-owned storage actor per graph. |
+| Feature callback lists and save completions | Replaced by awaitable shared refresh and ordered save tasks. |
+| Temporary `LegacyOrdersRepository` | Removed, superseded by `MemoryOrdersRepository`. |
+| Legacy VIP scenes/worker/static store and original tests | Retained as comparison evidence, no longer the live route; retirement is a separate checkpoint. |
+| Core Data `perform` callbacks, construction/deinit saves | Unchanged alternative store; next storage-specific checkpoint. |
+| Empty `OrdersAPI` methods and tests | Still classified as a teaching stub, not functioning networking. |
+
+Next: manually accept this live-path checkpoint, commit it, then address the
+alternative Core Data implementation and replacement coverage before retiring
+the old callback layer. Keep visual/behaviour acceptance separate from test counts.

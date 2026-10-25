@@ -4,22 +4,34 @@ struct ListOrdersView: View {
     @State private var viewModel = ListOrdersViewModel()
 
     var body: some View {
-        List(viewModel.rows) { row in
-            Button {
-                viewModel.showOrder(id: row.id)
-            } label: {
-                HStack {
-                    Text(row.date)
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Text(row.total)
-                        .foregroundStyle(.primary)
-                }
-                .frame(minHeight: 28)
-                .contentShape(Rectangle())
+        List {
+            if viewModel.isRefreshing && viewModel.rows.isEmpty {
+                ProgressView("Loading orders…")
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("order-row-\(row.id ?? "unidentified")")
+            if let message = viewModel.refreshErrorMessage {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(message)
+                    Button("Retry") { viewModel.refresh() }
+                        .disabled(viewModel.isRefreshing)
+                }
+            }
+            ForEach(viewModel.rows) { row in
+                Button {
+                    viewModel.showOrder(id: row.id)
+                } label: {
+                    HStack {
+                        Text(row.date)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text(row.total)
+                            .foregroundStyle(.primary)
+                    }
+                    .frame(minHeight: 28)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("order-row-\(row.id ?? "unidentified")")
+            }
         }
         .listStyle(.plain)
         .navigationTitle("List Orders")
@@ -36,6 +48,6 @@ struct ListOrdersView: View {
         .navigationDestination(isPresented: $viewModel.showsEditor) {
             CreateOrderView()
         }
-        .onAppear(perform: viewModel.refresh)
+        .task { await viewModel.refresh().value }
     }
 }

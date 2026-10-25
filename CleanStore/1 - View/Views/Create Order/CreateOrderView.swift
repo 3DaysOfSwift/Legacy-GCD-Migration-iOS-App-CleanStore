@@ -48,7 +48,7 @@ struct CreateOrderView: View {
                         "Expiration Date",
                         selection: Binding(
                             get: { viewModel.draft.paymentMethod.expirationDate },
-                            set: viewModel.selectExpirationDate
+                            set: { viewModel.selectExpirationDate($0) }
                         ),
                         displayedComponents: [.date, .hourAndMinute]
                     )
@@ -78,7 +78,7 @@ struct CreateOrderView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Save", action: viewModel.save)
+                Button("Save") { viewModel.save() }
                     .disabled(viewModel.isSaving || viewModel.didSave)
                     .accessibilityIdentifier("save-order")
             }

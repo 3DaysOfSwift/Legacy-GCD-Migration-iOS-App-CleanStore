@@ -31,7 +31,7 @@ it records replacement protection and current results, not completed migration.
 
 | ID | Evidence | Classification | Decision/status |
 | --- | --- | --- | --- |
-| DIFF-001 | Worker fetch failure becomes `[]`; UI cannot distinguish failed load from empty results. | Existing defect exposed | Preserve baseline pending approval for visible load failure/retry |
+| DIFF-001 | Worker fetch failure becomes `[]`; UI cannot distinguish failed load from empty results. | Intended approved change | Matthew Thomas approved error + Retry with retained orders on 25 October 2026. Implemented/tested in checkpoint 2; rendered failure-state acceptance remains outstanding. |
 | DIFF-002 | Core Data update with unknown ID has no callback on the empty-fetch branch. | Existing defect exposed | Resolve before any continuation bridge; explicit not-found outcome needs tests |
 | DIFF-003 | Legacy equality treats sufficiently earlier dates as equal, potentially hiding incorrect test results. | Existing defect exposed | Do not use existing whole-order equality as sole replacement proof; review precise field assertions |
 | DIFF-004 | Presenter tests assert US strings but formatters use the current locale. | Environment or flaky evidence | Four tests fail with inherited UK-style output; identical binaries pass all 96 tests in US region. Keep product locale-aware; make replacement tests locale-explicit |
@@ -63,7 +63,36 @@ release, distinct saves completing in order, failure allowing queued work to
 proceed, and stale reads not reverting a successful edit. No timing sleeps were
 introduced in the new tests.
 
+## Checkpoint 2 replacement protection
+
+128 tests passed in the final US-region run. The original 96 remain unchanged;
+the new path has 32 tests. Existing APIs are now awaited directly by tests.
+
+| Requirements | New evidence | Status |
+| --- | --- | --- |
+| BEH-001–002 | List ViewModel awaits a shared refresh; repeated refresh and locale-formatting tests | Passed; SwiftUI initial work uses `.task`. |
+| BEH-003, BEH-005–006, BEH-012 | Existing identity, edit and discard tests converted to async; changed drafts queue and do not let an older completion dismiss a newer edit | Passed; full UI manual acceptance remains separate. |
+| BEH-004, BEH-010 | Feature ordered-save/failure tests; ViewModel duplicate, retry, released-editor tests | Passed; each command owns its result; no screen-disappearance data loss. |
+| BEH-007–009 | Existing picker/focus tests retained; no picker behaviour redesign in this pass | Passed component tests; manual gaps from checkpoint 1 remain. |
+| BEH-011 | `MemoryOrdersRepositoryTests.testDemoSeedsAndSeparateInstancesPreserveProcessOnlyLifetime` | Passed; live storage no longer uses a static array. Process-only lifetime preserved. |
+| BEH-013 | Original Core Data CRUD suite remains unchanged | Passed baseline tests; native async conversion/reopen durability still pending. |
+| BEH-014 | Real repository test for generation, placeholder total and field preservation | Passed, with injected deterministic ID. |
+| DIFF-001 | Feature failure-retention/retry test and List ViewModel first-load/refresh failure tests | Approved improvement implemented; previously loaded orders remain visible. |
+| BEH-004–006 | `testIdenticalTextFieldWritebackDuringSaveStillCompletesEditor` and `testChangedDateIsNotMistakenForIdenticalWriteback` | Simulator exposed a two-tap-dismissal regression after the initial 126-test pass. Fixed using exact draft snapshot comparison; single-tap edit and create reverified. |
+
+Additional concurrency evidence: pre-admission cancellation writes nothing;
+an admitted save completes despite caller cancellation; a cancelled refresh
+waiter does not cancel shared work; a delayed initial fetch preserves both newer
+edits and unrelated records. Failures release the queue for subsequent work.
+
 ## Manual regression record
+
+Checkpoint 2 smoke check: Codex, 25 October 2026, uncommitted async checkpoint,
+isolated iPhone Air/iOS 26.2, UK-style date/currency output. Edit/save returned to
+updated details on one tap after the writeback fix; new synthetic order returned
+to list on one tap with generated ID and £1.00 total. Terminate/relaunch restored
+the two demo seeds, confirming process-only lifetime. Rendered failure/Retry UI
+and full accessibility/form regression still require acceptance.
 
 Limited checkpoint-1 smoke check performed by Codex on 25 October 2026 against
 the uncommitted architecture checkpoint: isolated iPhone Air Simulator, iOS 26.2,

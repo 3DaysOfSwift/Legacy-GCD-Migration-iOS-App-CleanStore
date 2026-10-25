@@ -5,7 +5,11 @@ import Observation
 @Observable
 final class CreateOrderViewModel {
     private let ordersFeature: OrdersFeature
-    var draft: Order
+    var draft: Order {
+        didSet {
+            if !draft.hasSameSnapshot(as: oldValue) { draftRevision += 1 }
+        }
+    }
     private(set) var isSaving = false
     private(set) var didSave = false
     var showsSaveError = false
@@ -15,6 +19,9 @@ final class CreateOrderViewModel {
     // The original storyboard switch has no action or outlet. Preserve its
     // presentation without silently adding address-copying product behaviour.
     var sameAsShippingAddress = true
+    @ObservationIgnored private var draftRevision = 0
+    @ObservationIgnored private var submittedRevision: Int?
+    @ObservationIgnored private var saveTask: Task<Void, Never>?
 
     init(ordersFeature: OrdersFeature = AppModel.shared.ordersFeature) {
         let draft = ordersFeature.makeOrderDraft()
@@ -57,21 +64,37 @@ final class CreateOrderViewModel {
         hasSelectedExpirationDate = true
     }
 
-    func save() {
-        // The form is disabled while saving, so another tap has no distinct draft.
-        guard !isSaving, !didSave else { return }
+    @discardableResult
+    func save() -> Task<Void, Never>? {
+        if let saveTask, submittedRevision == draftRevision { return saveTask }
+        guard !didSave else { return nil }
+        let predecessor = saveTask
+        let revision = draftRevision
+        let draftToSave = draft
+        submittedRevision = revision
         isSaving = true
         showsSaveError = false
-        ordersFeature.save(draft) { [weak self] savedOrder in
-            guard let self else { return }
-            isSaving = false
-            if let savedOrder {
+        // The form prevents changes while saving; still queue a distinct programmatic
+        // draft rather than returning the first draft's result. Do not retain the screen.
+        let task = Task { [weak self, ordersFeature] in
+            if let predecessor { await predecessor.value }
+            defer {
+                if self?.submittedRevision == revision {
+                    self?.isSaving = false
+                    self?.saveTask = nil
+                }
+            }
+            do {
+                let savedOrder = try await ordersFeature.save(draftToSave)
+                guard let self, submittedRevision == revision, draftRevision == revision else { return }
                 draft = savedOrder
                 didSave = true
-            } else {
-                showsSaveError = true
+            } catch {
+                if self?.submittedRevision == revision { self?.showsSaveError = true }
             }
         }
+        saveTask = task
+        return task
     }
 
     enum Field: Int, CaseIterable {

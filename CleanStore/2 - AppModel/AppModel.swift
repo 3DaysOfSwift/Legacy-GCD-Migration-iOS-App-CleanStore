@@ -13,16 +13,14 @@ final class AppModel {
     }
 
     static func live() -> AppModel {
-        let ordersWorker = OrdersWorker(ordersStore: OrdersMemStore())
-        let repository = LegacyOrdersRepository(ordersWorker: ordersWorker)
+        let repository = MemoryOrdersRepository(orders: MemoryOrdersRepository.demoOrders(at: Date()))
         let ordersFeature = OrdersFeature(repository: repository)
         return AppModel(ordersFeature: ordersFeature)
     }
 
-    // Callback-based until the separate concurrency checkpoint.
-    func applicationDidFinishLaunching() {
+    func applicationDidFinishLaunching() async {
         guard !hasRequestedLaunchRefresh else { return }
         hasRequestedLaunchRefresh = true
-        ordersFeature.refresh()
+        await ordersFeature.refresh()
     }
 }

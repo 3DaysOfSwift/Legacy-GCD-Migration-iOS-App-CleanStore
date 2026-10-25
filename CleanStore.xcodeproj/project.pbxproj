@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FA2000000000000000000001 /* MemoryOrdersRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA2000000000000000000002 /* MemoryOrdersRepositoryTests.swift */; };
 		715283072213143A004602FF /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 715283062213143A004602FF /* AppDelegate.swift */; };
 		7152830C2213143A004602FF /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7152830A2213143A004602FF /* Main.storyboard */; };
 		7152830E2213143D004602FF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7152830D2213143D004602FF /* Assets.xcassets */; };
@@ -55,7 +56,7 @@
 		71F1235C2214EF1C0009FC03 /* ShowOrderPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71F123592214EF1C0009FC03 /* ShowOrderPresenterTests.swift */; };
 		71F1235D2214EF1C0009FC03 /* ShowOrderInteractorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71F1235A2214EF1C0009FC03 /* ShowOrderInteractorTests.swift */; };
 		FA100000000000000000000D /* OrdersRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA100000000000000000000C /* OrdersRepository.swift */; };
-		FA100000000000000000000F /* LegacyOrdersRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA100000000000000000000E /* LegacyOrdersRepository.swift */; };
+		FA100000000000000000000F /* MemoryOrdersRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA100000000000000000000E /* MemoryOrdersRepository.swift */; };
 		A10000000000000000000011 /* OrdersFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* OrdersFeature.swift */; };
 		A10000000000000000000013 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* AppModel.swift */; };
 		A10000000000000000000015 /* OrderPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* OrderPresentation.swift */; };
@@ -93,6 +94,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		FA2000000000000000000002 /* MemoryOrdersRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryOrdersRepositoryTests.swift; sourceTree = "<group>"; };
 		715283032213143A004602FF /* CleanStore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CleanStore.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		715283062213143A004602FF /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7152830B2213143A004602FF /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
@@ -147,7 +149,7 @@
 		71F123592214EF1C0009FC03 /* ShowOrderPresenterTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShowOrderPresenterTests.swift; sourceTree = "<group>"; };
 		71F1235A2214EF1C0009FC03 /* ShowOrderInteractorTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShowOrderInteractorTests.swift; sourceTree = "<group>"; };
 		FA100000000000000000000C /* OrdersRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OrdersRepository.swift"; sourceTree = "<group>"; };
-		FA100000000000000000000E /* LegacyOrdersRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LegacyOrdersRepository.swift"; sourceTree = "<group>"; };
+		FA100000000000000000000E /* MemoryOrdersRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MemoryOrdersRepository.swift"; sourceTree = "<group>"; };
 		A10000000000000000000010 /* OrdersFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OrdersFeature.swift"; sourceTree = "<group>"; };
 		A10000000000000000000012 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel.swift"; sourceTree = "<group>"; };
 		A10000000000000000000014 /* OrderPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OrderPresentation.swift"; sourceTree = "<group>"; };
@@ -423,7 +425,7 @@
 		FA1000000000000000000004 /* Storage */ = {
 			isa = PBXGroup;
 			children = (
-				FA100000000000000000000E /* LegacyOrdersRepository.swift */,
+				FA100000000000000000000E /* MemoryOrdersRepository.swift */,
 			);
 			path = "Storage";
 			sourceTree = "<group>";
@@ -512,6 +514,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000000000000000000002D /* OrdersFeatureTests.swift */,
+				FA2000000000000000000002 /* MemoryOrdersRepositoryTests.swift */,
 			);
 			path = "Orders";
 			sourceTree = "<group>";
@@ -669,7 +672,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FA100000000000000000000D /* OrdersRepository.swift in Sources */,
-				FA100000000000000000000F /* LegacyOrdersRepository.swift in Sources */,
+				FA100000000000000000000F /* MemoryOrdersRepository.swift in Sources */,
 				A10000000000000000000011 /* OrdersFeature.swift in Sources */,
 				A10000000000000000000013 /* AppModel.swift in Sources */,
 				A10000000000000000000015 /* OrderPresentation.swift in Sources */,
@@ -717,6 +720,7 @@
 			files = (
 				A1000000000000000000002C /* ControllableOrdersRepository.swift in Sources */,
 				A1000000000000000000002E /* OrdersFeatureTests.swift in Sources */,
+				FA2000000000000000000001 /* MemoryOrdersRepositoryTests.swift in Sources */,
 				A10000000000000000000030 /* AppModelTests.swift in Sources */,
 				A10000000000000000000032 /* ListOrdersViewModelTests.swift in Sources */,
 				A10000000000000000000034 /* ShowOrderViewModelTests.swift in Sources */,

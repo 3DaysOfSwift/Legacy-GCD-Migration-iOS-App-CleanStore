@@ -11,10 +11,15 @@ import UIKit
 class AppDelegate: UIResponder, UIApplicationDelegate
 {
   var window: UIWindow?
+  private var launchRefreshTask: Task<Void, Never>?
   
   func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool
   {
-    AppModel.shared.applicationDidFinishLaunching()
+    // App-lifetime refresh: leaving a screen must not cancel shared startup work.
+    launchRefreshTask = Task { [weak self] in
+      defer { self?.launchRefreshTask = nil }
+      await AppModel.shared.applicationDidFinishLaunching()
+    }
     return true
   }
   

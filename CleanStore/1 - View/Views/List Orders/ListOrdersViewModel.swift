@@ -5,6 +5,7 @@ import Observation
 @Observable
 final class ListOrdersViewModel {
     private let ordersFeature: OrdersFeature
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
     var showsOrder = false
     var showsEditor = false
 
@@ -16,8 +17,20 @@ final class ListOrdersViewModel {
         ordersFeature.orders.map(OrderPresentation.init)
     }
 
-    func refresh() {
-        ordersFeature.refresh()
+    var isRefreshing: Bool { ordersFeature.isRefreshing }
+    var refreshErrorMessage: String? {
+        ordersFeature.refreshError == nil ? nil : "Orders could not be loaded. Please try again."
+    }
+
+    @discardableResult
+    func refresh() -> Task<Void, Never> {
+        if let refreshTask { return refreshTask }
+        let task = Task { [weak self, ordersFeature] in
+            defer { self?.refreshTask = nil }
+            await ordersFeature.refresh()
+        }
+        refreshTask = task
+        return task
     }
 
     func showOrder(id: String?) {

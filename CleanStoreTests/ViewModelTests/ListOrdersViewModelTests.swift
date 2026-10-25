@@ -4,11 +4,49 @@ import XCTest
 
 final class ListOrdersViewModelTests: XCTestCase {
     @MainActor
-    func testRefreshDisplaysRepositoryOrderAndUsesCurrentLocale() {
+    func testRepeatedRefreshWaitsForOneRequestAndPublishesTogether() async {
+        let repository = ControllableOrdersRepository()
+        repository.holdsFetches = true
+        defer { repository.releasePendingRequests() }
+        let started = expectation(description: "One read started")
+        repository.fetchStarted = { started.fulfill() }
+        let viewModel = ListOrdersViewModel(ordersFeature: OrdersFeature(repository: repository))
+        let first = viewModel.refresh()
+        let repeated = viewModel.refresh()
+        await fulfillment(of: [started], timeout: 2)
+        XCTAssertTrue(viewModel.isRefreshing)
+        XCTAssertTrue(viewModel.rows.isEmpty)
+        XCTAssertEqual(repository.fetchCount, 1)
+        repository.finishFetch(with: [Seeds.Orders.amy])
+        await first.value
+        await repeated.value
+        XCTAssertFalse(viewModel.isRefreshing)
+        XCTAssertEqual(viewModel.rows.map(\.id), ["aaa111"])
+    }
+
+    @MainActor
+    func testFailedInitialLoadIsVisibleAndRetryRecoversWithoutReplacingViewModel() async {
+        let repository = ControllableOrdersRepository(orders: [Seeds.Orders.amy])
+        repository.failsNextFetch = true
+        let viewModel = ListOrdersViewModel(ordersFeature: OrdersFeature(repository: repository))
+        await viewModel.refresh().value
+        XCTAssertNotNil(viewModel.refreshErrorMessage)
+        XCTAssertTrue(viewModel.rows.isEmpty)
+        await viewModel.refresh().value
+        XCTAssertNil(viewModel.refreshErrorMessage)
+        XCTAssertEqual(viewModel.rows.map(\.id), ["aaa111"])
+        repository.failsNextFetch = true
+        await viewModel.refresh().value
+        XCTAssertNotNil(viewModel.refreshErrorMessage)
+        XCTAssertEqual(viewModel.rows.map(\.id), ["aaa111"])
+    }
+
+    @MainActor
+    func testRefreshDisplaysRepositoryOrderAndUsesCurrentLocale() async throws {
         let repository = ControllableOrdersRepository(orders: [Seeds.Orders.bob, Seeds.Orders.amy])
         let feature = OrdersFeature(repository: repository)
         let viewModel = ListOrdersViewModel(ordersFeature: feature)
-        viewModel.refresh()
+        await viewModel.refresh().value
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .short
         let currencyFormatter = NumberFormatter()
@@ -19,10 +57,10 @@ final class ListOrdersViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testSelectingOrderAndCreatingDraftUseTheSameFeature() {
+    func testSelectingOrderAndCreatingDraftUseTheSameFeature() async throws {
         let feature = OrdersFeature(repository: ControllableOrdersRepository(orders: [Seeds.Orders.amy]))
         let viewModel = ListOrdersViewModel(ordersFeature: feature)
-        viewModel.refresh()
+        await viewModel.refresh().value
         viewModel.showOrder(id: "aaa111")
         XCTAssertTrue(viewModel.showsOrder)
         XCTAssertEqual(feature.selectedOrderID, "aaa111")

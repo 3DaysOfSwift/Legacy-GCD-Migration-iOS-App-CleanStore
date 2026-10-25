@@ -8,7 +8,7 @@
 
 import Foundation
 
-struct Order: Equatable
+struct Order: Equatable, Sendable
 {
   // MARK: Contact info
   var firstName: String
@@ -28,6 +28,15 @@ struct Order: Equatable
   var id: String?
   var date: Date
   var total: NSDecimalNumber
+
+  /// Draft identity needs exact dates, unlike the legacy tolerance-based equality.
+  /// Text controls may write the same snapshot again when they relinquish focus.
+  func hasSameSnapshot(as other: Order) -> Bool
+  {
+    return self == other
+      && date == other.date
+      && paymentMethod.expirationDate == other.paymentMethod.expirationDate
+  }
 }
 
 func ==(lhs: Order, rhs: Order) -> Bool
@@ -47,7 +56,7 @@ func ==(lhs: Order, rhs: Order) -> Bool
 
 // MARK: - Supporting models
 
-struct Address
+struct Address: Sendable
 {
   var street1: String
   var street2: String?
@@ -65,9 +74,9 @@ func ==(lhs: Address, rhs: Address) -> Bool
     && lhs.zip == rhs.zip
 }
 
-struct ShipmentMethod
+struct ShipmentMethod: Sendable
 {
-  enum ShippingSpeed: Int {
+  enum ShippingSpeed: Int, Sendable {
     case Standard = 0 // "Standard Shipping"
     case OneDay = 1 // "One-Day Shipping"
     case TwoDay = 2 // "Two-Day Shipping"
@@ -92,7 +101,7 @@ func ==(lhs: ShipmentMethod, rhs: ShipmentMethod) -> Bool
   return lhs.speed == rhs.speed
 }
 
-struct PaymentMethod
+struct PaymentMethod: Sendable
 {
   var creditCardNumber: String
   var expirationDate: Date
