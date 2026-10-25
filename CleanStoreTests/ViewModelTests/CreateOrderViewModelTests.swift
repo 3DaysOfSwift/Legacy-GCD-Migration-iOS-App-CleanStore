@@ -4,6 +4,65 @@ import XCTest
 
 final class CreateOrderViewModelTests: XCTestCase {
     @MainActor
+    func testEditingLoadsEveryFieldAndFormatsExistingPickerValues() async throws {
+        let expected = Seeds.Orders.amy
+        let feature = OrdersFeature(repository: ControllableOrdersRepository(orders: [expected]))
+        await feature.refresh()
+        feature.prepareEditingOrder(id: expected.id)
+        let viewModel = CreateOrderViewModel(ordersFeature: feature)
+        XCTAssertTrue(viewModel.draft.hasSameSnapshot(as: expected))
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .none
+        XCTAssertEqual(viewModel.expirationDateText, formatter.string(from: expected.paymentMethod.expirationDate))
+        XCTAssertEqual(viewModel.shippingSpeedText, "Standard Shipping")
+        for (speed, title) in [(ShipmentMethod.ShippingSpeed.Standard, "Standard Shipping"), (.OneDay, "One-Day Shipping"), (.TwoDay, "Two-Day Shipping")] {
+            viewModel.selectShippingSpeed(speed)
+            XCTAssertEqual(viewModel.draft.shipmentMethod.speed, speed)
+            XCTAssertEqual(viewModel.shippingSpeedText, title)
+        }
+        let changedDate = Date(timeIntervalSince1970: 123456789)
+        viewModel.selectExpirationDate(changedDate)
+        XCTAssertEqual(viewModel.expirationDateText, formatter.string(from: changedDate))
+    }
+
+    @MainActor
+    func testFailedEditRetainsAllFieldsAndRetryUpdatesWithoutInserting() async throws {
+        let repository = ControllableOrdersRepository(orders: [Seeds.Orders.amy])
+        let feature = OrdersFeature(repository: repository)
+        await feature.refresh()
+        feature.prepareEditingOrder(id: "aaa111")
+        let viewModel = CreateOrderViewModel(ordersFeature: feature)
+        viewModel.draft.email = "retry@example.com"
+        let edited = viewModel.draft
+        repository.failsNextSave = true
+        await viewModel.save()?.value
+        XCTAssertEqual(viewModel.failureTitle, "Failed to update order")
+        XCTAssertTrue(viewModel.showsSaveError)
+        XCTAssertFalse(viewModel.didSave)
+        XCTAssertTrue(viewModel.draft.hasSameSnapshot(as: edited))
+        XCTAssertTrue(try XCTUnwrap(feature.orders.first).hasSameSnapshot(as: Seeds.Orders.amy))
+        await viewModel.save()?.value
+        XCTAssertTrue(viewModel.didSave)
+        XCTAssertFalse(viewModel.showsSaveError)
+        XCTAssertEqual(feature.orders.count, 1)
+        XCTAssertTrue(try XCTUnwrap(feature.orders.first).hasSameSnapshot(as: edited))
+    }
+
+    @MainActor
+    func testBlankFormRemainsSaveableWithoutInventingValidation() async throws {
+        let repository = MemoryOrdersRepository(orders: [], makeOrderID: { "blank-order" })
+        let feature = OrdersFeature(repository: repository)
+        let viewModel = CreateOrderViewModel(ordersFeature: feature)
+        await viewModel.save()?.value
+        XCTAssertTrue(viewModel.didSave)
+        let saved = try XCTUnwrap(feature.orders.first)
+        XCTAssertEqual(saved.id, "blank-order")
+        XCTAssertEqual(saved.total, .one)
+        XCTAssertEqual(saved.email, "")
+        XCTAssertEqual(saved.paymentMethod.creditCardNumber, "")
+    }
+    @MainActor
     func testIdenticalTextFieldWritebackDuringSaveStillCompletesEditor() async {
         let repository = ControllableOrdersRepository()
         repository.holdsSaves = true
@@ -197,8 +256,15 @@ final class CreateOrderViewModelTests: XCTestCase {
     @MainActor
     func testTextFocusAdvancesAndEndsAtLastField() async throws {
         let viewModel = CreateOrderViewModel(ordersFeature: OrdersFeature(repository: ControllableOrdersRepository()))
-        XCTAssertEqual(viewModel.nextField(after: .firstName), .lastName)
-        XCTAssertEqual(viewModel.nextField(after: .billingState), .billingZIP)
+        let fields: [CreateOrderViewModel.Field] = [
+            .firstName, .lastName, .phone, .email,
+            .shipmentStreet1, .shipmentStreet2, .shipmentCity, .shipmentState, .shipmentZIP,
+            .creditCardNumber, .cvv,
+            .billingStreet1, .billingStreet2, .billingCity, .billingState, .billingZIP
+        ]
+        for (current, next) in zip(fields, fields.dropFirst()) {
+            XCTAssertEqual(viewModel.nextField(after: current), next)
+        }
         XCTAssertNil(viewModel.nextField(after: .billingZIP))
     }
 }

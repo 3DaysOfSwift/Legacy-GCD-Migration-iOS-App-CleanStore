@@ -385,3 +385,97 @@ storage-only checkpoint. The earlier UI/accessibility gaps remain open.
 Next: commit this checkpoint, then map and retire the unused legacy layers in a
 separate pass, moving their remaining storage representations under their feature
 owner. Re-run the replacement and regression tests before deleting baseline tests.
+
+## Checkpoint 4 — retire legacy paths and organise feature ownership
+
+Date: 25 October 2026. Implemented and verified below; awaiting Matthew Thomas's
+review and Git checkpoint. This checkpoint is not final migration acceptance.
+
+### Changes and retirement gate
+
+- Added six replacement tests before deleting anything, then ran the combined
+  legacy/replacement suite: **142 passed**. The file-by-file retirement map in
+  `MIGRATION_BEHAVIOUR_CONTRACT.md` distinguishes product outcomes from obsolete
+  VIP spy assertions, three equivalent callback-signature variants, empty API
+  tests and unrelated teaching examples.
+- Removed the unused three UIKit/VIP scenes and Main.storyboard, the callback
+  worker/store protocols and implementations, the nonfunctional OrdersAPI stub,
+  and their obsolete tests. These remain recoverable from commit `6a8ca52`.
+  No user data or persisted store was removed.
+- MemoryOrdersRepository now retains concrete single-order fetch/delete
+  capabilities as well as the live feature's existing fetch-all/create/update
+  operations. Errors and unaffected records are tested. No new delete UI or
+  unnecessary live repository-contract requirement was introduced.
+- Moved Order into its feature's Data Types folder. Core Data representations,
+  repository and unchanged model resource now live together under Orders/Storage.
+  Removed the unused force-unwrapping legacy `toOrder()` mapper; the checked
+  repository mapping already handles malformed records and stored shipping speed.
+- Moved AppDelegate under the presentation layer, test seeds into Support and
+  real repository tests into PersistenceTests/Orders. Xcode groups match the
+  on-disk organisation and no retired source/resource remains in build phases.
+- Kept LaunchScreen.storyboard, bundle IDs, managed-object class identity, model
+  schema, SQLite location, live in-memory composition and current UI unchanged.
+  The moved model XML differs only by a final newline; schema text is identical.
+  No themes, networking or newly persistent live storage were added.
+
+### Resulting ownership
+
+```text
+CleanStore/
+├── 1 - View/
+│   ├── App.swift
+│   ├── AppDelegate.swift
+│   ├── Order Formatting/OrderPresentation.swift
+│   └── Views/ (Root, List Orders, Show Order, Create Order)
+└── 2 - AppModel/
+    ├── AppModel.swift
+    └── Features/Orders/
+        ├── OrdersFeature.swift
+        ├── OrdersRepository.swift
+        ├── Data Types/Order.swift
+        └── Storage/
+            ├── MemoryOrdersRepository.swift
+            └── Core Data/
+                ├── CoreDataOrdersRepository.swift
+                ├── ManagedOrder+CoreDataClass.swift
+                ├── ManagedOrder+CoreDataProperties.swift
+                └── CleanStore.xcdatamodeld
+
+CleanStoreTests/
+├── AppModelTests/
+├── FeatureTests/Orders/
+├── PersistenceTests/Orders/
+├── ViewModelTests/
+└── Support/
+```
+
+### Verification and remaining limits
+
+- After retirement: **46 replacement tests passed** with en/US; the same 46
+  passed again in en/GB. The smaller count removes 96 legacy cases, including
+  duplicate interface variants and 18 empty/unrelated examples—not 96 distinct
+  product requirements. UI rendering coverage is explicitly not equivalent.
+- Complete concurrency checking was enabled for the build as a diagnostic
+  override. No Swift compiler warnings appeared. Xcode still emitted the
+  no-AppIntents-dependency metadata-extraction warning; the deliberately invalid
+  database path emitted expected Core Data diagnostics.
+- Result bundles: `/private/tmp/CleanStore-cfa-retirement-before-20261025.xcresult`,
+  `/private/tmp/CleanStore-cfa-retirement-after-20261025.xcresult` and
+  `/private/tmp/CleanStore-cfa-retirement-GB-20261025.xcresult`.
+- Simulator smoke checks passed for edit/create on one Save tap, shipping/expiry
+  selection and reopening, Return focus between the first two fields, discard,
+  and process-only relaunch behaviour. Detailed scope is in the behaviour contract.
+- Shared scheme still skips the inherited UI-test placeholder. Real-device,
+  iPad/rotation/accessibility and rendered failure/retry acceptance remain open.
+  Existing storage fault-injection gaps from checkpoint 3 are not closed here.
+- Swift language mode remains 5. No Swift 6 completion or measured performance
+  improvement is claimed. Legacy equality's one-sided date comparison remains a
+  separately recorded concern; exact snapshot assertions avoid hiding it.
+
+### Next checkpoint
+
+Review this removal checkpoint and perform the remaining manual journeys.
+Then audit the surviving feature's task ownership, actor reentrancy and Main
+Actor work, and decide whether to enable complete checking in project settings.
+Keep any resulting changes small and separately verified; do not treat a clean
+build or fewer files as proof that migration is finished.

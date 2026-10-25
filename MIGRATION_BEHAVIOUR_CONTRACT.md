@@ -1,12 +1,12 @@
 # CleanStore product behaviour contract
 
 Baseline: `e13b868bda3ad1a5987aadbff249b557c1e82d27`, 25 October 2026.
-Paths below are relative to the repository. Test class names match their files
-under `CleanStoreTests/Scenes`, `Services` or `Workers`.
+Paths below are relative to the repository. Legacy test class names refer to
+their files at the baseline commit; checkpoint 4 records their retirement.
 
 Confirmed means explicit tests support intent, not that end-to-end behaviour has
 been manually verified. Inferred rows are source evidence requiring acceptance.
-Checkpoint 1 adds SwiftUI replacements; the original tests and storage remain.
+Checkpoint 1 added SwiftUI replacements; checkpoint 4 removes the unused legacy code.
 The baseline table below is retained as provenance. The checkpoint mapping after
 it records replacement protection and current results, not completed migration.
 
@@ -132,3 +132,59 @@ iPad/rotation and relaunch behaviour. Use synthetic payment data only.
 
 Do not remove a legacy test merely because its implementation is being removed:
 first link the corresponding replacement protection here and demonstrate parity.
+
+## Checkpoint 4 legacy-test retirement map
+
+Before retirement, the combined suite passed **142 tests, zero failures** on
+25 October 2026 (Xcode 26.2, iPhone Air/iOS 26.2, en/US, complete concurrency
+checking diagnostic override).
+Result: `/private/tmp/CleanStore-cfa-retirement-before-20261025.xcresult`.
+
+The following maps every retired test file to replacement protection. Assertions
+about calling a VIP spy or configuring a UIKit table are not retained as API
+requirements: their observable result is protected below. Native-control rendering
+and navigation still require manual acceptance; unit tests do not prove them.
+
+| Retired tests | Requirements and replacement evidence |
+| --- | --- |
+| ListOrdersInteractorTests, ListOrdersPresenterTests, ListOrdersViewControllerTests | BEH-001–002: ListOrdersViewModelTests covers refresh, row count/content and current-locale formatting; OrdersFeatureTests covers shared loads, failure retention and stale refresh. Single-list composition is visible in ListOrdersView; UIKit section/reload mechanics no longer exist. |
+| ShowOrderInteractorTests, ShowOrderPresenterTests, ShowOrderViewControllerTests | BEH-003, 006: ShowOrderViewModelTests covers stable selected identity, all five displayed values, and updates observed after an edit. SwiftUI binds those values directly. |
+| CreateOrderInteractorTests, CreateOrderPresenterTests | BEH-004–008: CreateOrderViewModelTests covers blank defaults, every prepopulated field, three shipping choices, current-locale expiry formatting, unchanged identity/date/total, create/update completion and precise draft snapshots. Duplicate Spy/Mock variants become one outcome check. |
+| CreateOrderViewControllerTests | BEH-004–010, 012: CreateOrderViewModelTests covers create/edit completion, both failure titles with retained drafts and retry, all 16 text-field focus transitions, final nil focus, picker values and discard. The View binds didSave to dismissal, error state to an alert and focus to FocusState. Actual keyboard, menu, wheel and navigation rendering remain manual checks, not automated UI coverage. |
+| OrdersWorkerTests | BEH-004–006, 011: OrdersFeatureTests awaits fetch/create/update and proves ordered saves, failure release and cancellation policy; List/Create/Show ViewModel tests cover results reaching UI state. |
+| OrdersMemStoreTests | BEH-011, 014 and concrete storage CRUD: MemoryOrdersRepositoryTests covers all-record/single-record fetch, create, update, delete, missing IDs, generated defaults, field preservation and separate-instance lifetime. Three callback-signature variants are replaced by one async interface. |
+| OrdersCoreDataStoreTests | BEH-013–014, DIFF-002/008: CoreDataOrdersRepositoryTests covers all five CRUD operations, reopen visibility, schema fixture compatibility, errors, later recovery and stored shipping speed. Three callback-signature variants become native async operations. |
+| OrdersAPITests | Fifteen empty test bodies against an unused API stub; no verified network behaviour existed to transfer. No networking feature is introduced. |
+| CleanStoreTests | Empty example and empty performance measurement; neither provides a product requirement or useful benchmark. |
+| TheLittleMocker | Unrelated mock-authentication teaching example, not a CleanStore feature or authentication requirement. |
+
+Checkpoint 4 adds six tests before deletion: two memory fetch/delete tests, three
+editor tests (complete prepopulation/pickers, failed-update retry and permissive
+blank saves), and one detail-display test. It also expands focus coverage from a
+sample transition to the complete field sequence. Exact snapshots compare dates
+directly rather than trusting legacy Order equality (DIFF-003).
+
+The 96 retired tests comprise 78 product/component cases (including repeated
+callback/spy variants) and 18 empty or unrelated examples. The surviving suite
+has 46 tests; this count reduction is not a claim of identical UI coverage.
+Legacy files remain recoverable from Git checkpoint `6a8ca52`. The table above
+and the baseline table retain their evidence after their source paths disappear.
+
+After retirement: **46 tests passed in en/US and all 46 passed again in en/GB**.
+Results: `/private/tmp/CleanStore-cfa-retirement-after-20261025.xcresult` and
+`/private/tmp/CleanStore-cfa-retirement-GB-20261025.xcresult`.
+
+Manual checkpoint-4 smoke check by Codex on 25 October 2026, uncommitted working
+tree based on `6a8ca52`, isolated iPhone Air/iOS 26.2, UK-style output:
+list/detail values; edit prepopulation; row tap to focus and Return from first
+to last name; all three shipping choices shown; selecting Two-Day; expiry wheel
+changing 25 to 26 October; single-tap save back to updated details; reopening with
+saved shipping/expiry values; Back discarding another draft; new order save
+returning to a third row with £1.00; relaunch restoring two demo seeds. These
+checks passed. Only synthetic edits and the sample's existing fake payment data
+were used.
+
+Still unverified manually: every keyboard transition/software-keyboard dismissal,
+rendered failure/retry states, full field-by-field round trip, VoiceOver, Dynamic
+Type, iPad, rotation and physical devices. The inherited UI-test target remains
+skipped in the shared scheme; no automated UI coverage is claimed.

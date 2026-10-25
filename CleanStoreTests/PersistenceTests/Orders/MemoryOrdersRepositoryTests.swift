@@ -3,6 +3,31 @@ import XCTest
 @testable import CleanStore
 
 final class MemoryOrdersRepositoryTests: XCTestCase {
+    func testFetchAndDeleteUseIdentityAndLeaveOtherRecordsUntouched() async throws {
+        let repository = MemoryOrdersRepository(orders: [Seeds.Orders.amy, Seeds.Orders.bob])
+        let fetched = try await repository.fetchOrder(id: "aaa111")
+        XCTAssertTrue(fetched.hasSameSnapshot(as: Seeds.Orders.amy))
+        let deleted = try await repository.deleteOrder(id: "aaa111")
+        XCTAssertTrue(deleted.hasSameSnapshot(as: Seeds.Orders.amy))
+        let remaining = try await repository.fetchOrders()
+        XCTAssertEqual(remaining.map(\.id), ["bbb222"])
+        XCTAssertTrue(try XCTUnwrap(remaining.first).hasSameSnapshot(as: Seeds.Orders.bob))
+    }
+
+    func testMissingFetchAndDeleteThrowWithoutChangingCollection() async throws {
+        let repository = MemoryOrdersRepository(orders: [Seeds.Orders.amy])
+        do {
+            _ = try await repository.fetchOrder(id: "absent")
+            XCTFail("Missing fetch must throw")
+        } catch { XCTAssertEqual(error as? MemoryOrdersRepository.StorageError, .orderNotFound("absent")) }
+        do {
+            _ = try await repository.deleteOrder(id: "absent")
+            XCTFail("Missing delete must throw")
+        } catch { XCTAssertEqual(error as? MemoryOrdersRepository.StorageError, .orderNotFound("absent")) }
+        let remaining = try await repository.fetchOrders()
+        XCTAssertEqual(remaining.map(\.id), ["aaa111"])
+    }
+
     func testDemoSeedsAndSeparateInstancesPreserveProcessOnlyLifetime() async throws {
         let date = Date(timeIntervalSince1970: 12345)
         let seeds = MemoryOrdersRepository.demoOrders(at: date)

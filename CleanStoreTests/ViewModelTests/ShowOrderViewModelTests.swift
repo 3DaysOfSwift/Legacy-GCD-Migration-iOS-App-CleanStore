@@ -1,7 +1,26 @@
+import Foundation
 import XCTest
 @testable import CleanStore
 
 final class ShowOrderViewModelTests: XCTestCase {
+    @MainActor
+    func testDetailsExposeAllLegacyDisplayFieldsUsingCurrentLocale() async throws {
+        let expected = Seeds.Orders.amy
+        let feature = OrdersFeature(repository: ControllableOrdersRepository(orders: [expected]))
+        await feature.refresh()
+        feature.selectOrder(id: expected.id)
+        let viewModel = ShowOrderViewModel(ordersFeature: feature)
+        let details = try XCTUnwrap(viewModel.order)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .short
+        let currencyFormatter = NumberFormatter()
+        currencyFormatter.numberStyle = .currency
+        XCTAssertEqual(details.id, expected.id)
+        XCTAssertEqual(details.email, expected.email)
+        XCTAssertEqual(details.name, "Amy Apple")
+        XCTAssertEqual(details.date, dateFormatter.string(from: expected.date))
+        XCTAssertEqual(details.total, currencyFormatter.string(from: expected.total))
+    }
     @MainActor
     func testOpenDetailsKeepTheirIdentityWhenAnotherOrderIsSelected() async throws {
         let feature = OrdersFeature(repository: ControllableOrdersRepository(

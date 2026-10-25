@@ -12,16 +12,6 @@ import CoreData
 
 public class ManagedOrder: NSManagedObject
 {
-  func toOrder() -> Order
-  {
-    let billingAddress = Address(street1: billingAddressStreet1!, street2: billingAddressStreet2!, city: billingAddressCity!, state: billingAddressState!, zip: billingAddressZIP!)
-    let shipmentAddress = Address(street1: shipmentAddressStreet1!, street2: shipmentAddressStreet2!, city: shipmentAddressCity!, state: shipmentAddressState!, zip: shipmentAddressZIP!)
-    let paymentMethod = PaymentMethod(creditCardNumber: paymentMethodCreditCardNumber!, expirationDate: paymentMethodExpirationDate!, cvv: paymentMethodCVV!)
-    let shipmentMethod = ShipmentMethod(speed: .Standard)
-    
-    return Order(firstName: firstName!, lastName: lastName!, phone: phone!, email: email!, billingAddress: billingAddress, paymentMethod: paymentMethod, shipmentAddress: shipmentAddress, shipmentMethod: shipmentMethod, id: id, date: date!, total: total!)
-  }
-  
   func fromOrder(order: Order)
   {
     firstName = order.firstName

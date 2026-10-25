@@ -20,6 +20,22 @@ actor MemoryOrdersRepository: OrdersRepository {
         return orders
     }
 
+    func fetchOrder(id: String) throws -> Order {
+        try Task.checkCancellation()
+        guard let order = orders.first(where: { $0.id == id }) else {
+            throw StorageError.orderNotFound(id)
+        }
+        return order
+    }
+
+    func deleteOrder(id: String) throws -> Order {
+        try Task.checkCancellation()
+        guard let index = orders.firstIndex(where: { $0.id == id }) else {
+            throw StorageError.orderNotFound(id)
+        }
+        return orders.remove(at: index)
+    }
+
     func createOrder(_ draft: Order) throws -> Order {
         try Task.checkCancellation()
         var order = draft
